@@ -19,7 +19,7 @@
 #define GROUP_MAX_EPS_IQ2_S 1e-8f
 #define GROUP_MAX_EPS_IQ1_M 1e-7f
 #define GROUP_MAX_EPS_IQ1_S 1e-12f
-
+#undef __ARM_FEATURE_DOTPROD
 #if defined(_MSC_VER)
 // disable "possible loss of data" to avoid warnings for hundreds of casts
 // we should just be careful :)
@@ -3722,6 +3722,9 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * restrict s, size_t bs, const void * 
 #else
         int16x8_t sumi0 = vdupq_n_s16(0);
         int16x8_t sumi1 = vdupq_n_s16(0);
+
+        int16x8_t mask1 = vdupq_n_s16(1);
+        int16x8_t mask2 = vdupq_n_s16(2);
 #endif
 
         // first 32 bytes of 5 elements
@@ -3748,6 +3751,12 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * restrict s, size_t bs, const void * 
             int8x16_t sqx7 = vreinterpretq_s8_u8(vshrq_n_u8(vhaddq_u8(qx7, vshrq_n_u8(qx7, 1)), 6));
             int8x16_t sqx8 = vreinterpretq_s8_u8(vshrq_n_u8(vhaddq_u8(qx8, vshrq_n_u8(qx8, 1)), 6));
             int8x16_t sqx9 = vreinterpretq_s8_u8(vshrq_n_u8(vhaddq_u8(qx9, vshrq_n_u8(qx9, 1)), 6));
+            // int8_t * sqx0_ptr = (int8_t *) malloc(8*16);
+            // vst1q_s8(sqx0_ptr, sqx0);
+            // for (int j = 0; j < 16; j++) {
+            //     printf("%d ", sqx0_ptr[j]);
+            // }
+            // free(sqx0_ptr);
 
             const int8x16_t qy0 = vld1q_s8(y[i].qs +   0);
             const int8x16_t qy1 = vld1q_s8(y[i].qs +  16);
@@ -3759,7 +3768,6 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * restrict s, size_t bs, const void * 
             const int8x16_t qy7 = vld1q_s8(y[i].qs + 112);
             const int8x16_t qy8 = vld1q_s8(y[i].qs + 128);
             const int8x16_t qy9 = vld1q_s8(y[i].qs + 144);
-
 #if defined(__ARM_FEATURE_DOTPROD)
             sumi0 = vdotq_s32(sumi0, sqx0, qy0);
             sumi1 = vdotq_s32(sumi1, sqx1, qy1);
@@ -3772,26 +3780,97 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * restrict s, size_t bs, const void * 
             sumi0 = vdotq_s32(sumi0, sqx8, qy8);
             sumi1 = vdotq_s32(sumi1, sqx9, qy9);
 #else
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx0), vget_low_s8(qy0));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx0), vget_high_s8(qy0));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx1), vget_low_s8(qy1));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx1), vget_high_s8(qy1));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx2), vget_low_s8(qy2));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx2), vget_high_s8(qy2));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx3), vget_low_s8(qy3));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx3), vget_high_s8(qy3));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx4), vget_low_s8(qy4));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx4), vget_high_s8(qy4));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx5), vget_low_s8(qy5));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx5), vget_high_s8(qy5));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx6), vget_low_s8(qy6));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx6), vget_high_s8(qy6));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx7), vget_low_s8(qy7));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx7), vget_high_s8(qy7));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx8), vget_low_s8(qy8));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx8), vget_high_s8(qy8));
-            sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx9), vget_low_s8(qy9));
-            sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx9), vget_high_s8(qy9));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx0), vget_low_s8(qy0));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx0), vget_high_s8(qy0));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx1), vget_low_s8(qy1));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx1), vget_high_s8(qy1));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx2), vget_low_s8(qy2));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx2), vget_high_s8(qy2));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx3), vget_low_s8(qy3));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx3), vget_high_s8(qy3));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx4), vget_low_s8(qy4));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx4), vget_high_s8(qy4));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx5), vget_low_s8(qy5));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx5), vget_high_s8(qy5));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx6), vget_low_s8(qy6));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx6), vget_high_s8(qy6));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx7), vget_low_s8(qy7));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx7), vget_high_s8(qy7));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx8), vget_low_s8(qy8));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx8), vget_high_s8(qy8));
+            // sumi0 = vmlal_s8(sumi0, vget_low_s8(sqx9), vget_low_s8(qy9));
+            // sumi1 = vmlal_s8(sumi1, vget_high_s8(sqx9), vget_high_s8(qy9));
+            
+            int8x16_t pos0 = vbslq_u8(vceqq_s8(sqx0,mask2), qy0, vdupq_n_s8(0));
+            int8x16_t neg0 = vbslq_u8(vceqq_s8(sqx0,mask1), qy0, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos0), vget_low_s8(neg0)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos0)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos0), vget_high_s8(neg0)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos0)));
+
+            int8x16_t pos1 = vbslq_u8(vceqq_s8(sqx1,mask2), qy1, vdupq_n_s8(0));
+            int8x16_t neg1 = vbslq_u8(vceqq_s8(sqx1,mask1), qy1, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos1), vget_low_s8(neg1)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos1)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos1), vget_high_s8(neg1)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos1)));
+
+            int8x16_t pos2 = vbslq_u8(vceqq_s8(sqx2,mask2), qy2, vdupq_n_s8(0));
+            int8x16_t neg2 = vbslq_u8(vceqq_s8(sqx2,mask1), qy2, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos2), vget_low_s8(neg2)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos2)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos2), vget_high_s8(neg2)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos2)));
+
+            int8x16_t pos3 = vbslq_u8(vceqq_s8(sqx3, mask2), qy3, vdupq_n_s8(0));
+            int8x16_t neg3 = vbslq_u8(vceqq_s8(sqx3, mask1), qy3, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos3), vget_low_s8(neg3)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos3)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos3), vget_high_s8(neg3)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos3)));
+
+            int8x16_t pos4 = vbslq_u8(vceqq_s8(sqx4, mask2), qy4, vdupq_n_s8(0));
+            int8x16_t neg4 = vbslq_u8(vceqq_s8(sqx4, mask1), qy4, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos4), vget_low_s8(neg4)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos4)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos4), vget_high_s8(neg4)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos4)));
+
+            int8x16_t pos5 = vbslq_u8(vceqq_s8(sqx5, mask2), qy5, vdupq_n_s8(0));
+            int8x16_t neg5 = vbslq_u8(vceqq_s8(sqx5, mask1), qy5, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos5), vget_low_s8(neg5)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos5)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos5), vget_high_s8(neg5)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos5)));
+
+            int8x16_t pos6 = vbslq_u8(vceqq_s8(sqx6, mask2), qy6, vdupq_n_s8(0));
+            int8x16_t neg6 = vbslq_u8(vceqq_s8(sqx6, mask1), qy6, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos6), vget_low_s8(neg6)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos6)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos6), vget_high_s8(neg6)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos6)));
+
+            int8x16_t pos7 = vbslq_u8(vceqq_s8(sqx7, mask2), qy7, vdupq_n_s8(0));
+            int8x16_t neg7 = vbslq_u8(vceqq_s8(sqx7, mask1), qy7, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos7), vget_low_s8(neg7)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos7)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos7), vget_high_s8(neg7)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos7)));
+
+            int8x16_t pos8 = vbslq_u8(vceqq_s8(sqx8, mask2), qy8, vdupq_n_s8(0));
+            int8x16_t neg8 = vbslq_u8(vceqq_s8(sqx8, mask1), qy8, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos8), vget_low_s8(neg8)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos8)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos8), vget_high_s8(neg8)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos8)));
+
+            int8x16_t pos9 = vbslq_u8(vceqq_s8(sqx9, mask2), qy9, vdupq_n_s8(0));
+            int8x16_t neg9 = vbslq_u8(vceqq_s8(sqx9, mask1), qy9, vdupq_n_s8(0));
+            sumi0 = vaddq_s16(sumi0, vaddl_s8(vget_low_s8(pos9), vget_low_s8(neg9)));
+            sumi0 = vaddq_s16(sumi0, vmovl_s8(vget_low_s8(pos9)));
+            sumi1 = vaddq_s16(sumi1, vaddl_s8(vget_high_s8(pos9), vget_high_s8(neg9)));
+            sumi1 = vaddq_s16(sumi1, vmovl_s8(vget_high_s8(pos9)));
+            
 #endif
         }
 
