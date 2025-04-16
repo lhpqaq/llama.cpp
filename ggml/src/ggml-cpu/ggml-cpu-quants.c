@@ -4337,6 +4337,9 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 #endif
 }
 
+#define NO_DOTQ
+#undef __ARM_FEATURE_DOTPROD
+
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     assert(nrc == 1);
     UNUSED(nrc);
@@ -4353,7 +4356,94 @@ void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     float sumf = 0.0f;
 
     const uint8x16_t m3 = vdupq_n_u8(3);
+#if defined(NO_DOTQ)
+    const uint8x16_t m2 = vdupq_n_s8(2);
+    const uint8x16_t m0 = vdupq_n_s8(0);
+    for (int i = 0; i < nb; ++i) {
+        int64_t tsum = 0;
+        for (size_t j = 0; j < sizeof(x->qs); j += 32) {
+            uint8x16_t qx0 = vld1q_u8(x[i].qs + j);
+            uint8x16_t qx1 = vld1q_u8(x[i].qs + j + 16);
+            uint8x16_t qx2 = vshrq_n_u8(qx0, 2);
+            uint8x16_t qx3 = vshrq_n_u8(qx1, 2);
+            uint8x16_t qx4 = vshrq_n_u8(qx0, 4);
+            uint8x16_t qx5 = vshrq_n_u8(qx1, 4);
+            uint8x16_t qx6 = vshrq_n_u8(qx0, 6);
+            uint8x16_t qx7 = vshrq_n_u8(qx1, 6);
 
+            // int8x16_t sqx0 = vreinterpretq_s8_u8(vandq_u8(qx0, m3));
+            // int8x16_t sqx1 = vreinterpretq_s8_u8(vandq_u8(qx1, m3));
+            // int8x16_t sqx2 = vreinterpretq_s8_u8(vandq_u8(qx2, m3));
+            // int8x16_t sqx3 = vreinterpretq_s8_u8(vandq_u8(qx3, m3));
+            // int8x16_t sqx4 = vreinterpretq_s8_u8(vandq_u8(qx4, m3));
+            // int8x16_t sqx5 = vreinterpretq_s8_u8(vandq_u8(qx5, m3));
+            // int8x16_t sqx6 = vreinterpretq_s8_u8(vandq_u8(qx6, m3));
+            // int8x16_t sqx7 = vreinterpretq_s8_u8(vandq_u8(qx7, m3));
+
+            const int8x16_t qy0 = vld1q_s8(y[i].qs + j*4 +   0);
+            const int8x16_t qy1 = vld1q_s8(y[i].qs + j*4 +  16);
+            const int8x16_t qy2 = vld1q_s8(y[i].qs + j*4 +  32);
+            const int8x16_t qy3 = vld1q_s8(y[i].qs + j*4 +  48);
+            const int8x16_t qy4 = vld1q_s8(y[i].qs + j*4 +  64);
+            const int8x16_t qy5 = vld1q_s8(y[i].qs + j*4 +  80);
+            const int8x16_t qy6 = vld1q_s8(y[i].qs + j*4 +  96);
+            const int8x16_t qy7 = vld1q_s8(y[i].qs + j*4 + 112);
+
+            int8x16_t sqx0 = vreinterpretq_s8_u8(vandq_u8(qx0, m3));
+            int8x16_t neg0 = qy0 & (int8x16_t)vceqq_s8(sqx0, m0);
+            int8x16_t pos0 = qy0 & (int8x16_t)vceqq_s8(sqx0, m2);
+            tsum += (int64_t)vaddlvq_s8(pos0);
+            tsum -= (int64_t)vaddlvq_s8(neg0);
+            
+            int8x16_t sqx1 = vreinterpretq_s8_u8(vandq_u8(qx1, m3));
+            int8x16_t neg1 = qy1 & (int8x16_t)vceqq_s8(sqx1, m0);
+            int8x16_t pos1 = qy1 & (int8x16_t)vceqq_s8(sqx1, m2);
+            tsum += (int64_t)vaddlvq_s8(pos1);
+            tsum -= (int64_t)vaddlvq_s8(neg1);
+            
+            int8x16_t sqx2 = vreinterpretq_s8_u8(vandq_u8(qx2, m3));
+            int8x16_t neg2 = qy2 & (int8x16_t)vceqq_s8(sqx2, m0);
+            int8x16_t pos2 = qy2 & (int8x16_t)vceqq_s8(sqx2, m2);
+            tsum += (int64_t)vaddlvq_s8(pos2);
+            tsum -= (int64_t)vaddlvq_s8(neg2);
+            
+            int8x16_t sqx3 = vreinterpretq_s8_u8(vandq_u8(qx3, m3));
+            int8x16_t neg3 = qy3 & (int8x16_t)vceqq_s8(sqx3, m0);
+            int8x16_t pos3 = qy3 & (int8x16_t)vceqq_s8(sqx3, m2);
+            tsum += (int64_t)vaddlvq_s8(pos3);
+            tsum -= (int64_t)vaddlvq_s8(neg3);
+            
+            int8x16_t sqx4 = vreinterpretq_s8_u8(vandq_u8(qx4, m3));
+            int8x16_t neg4 = qy4 & (int8x16_t)vceqq_s8(sqx4, m0);
+            int8x16_t pos4 = qy4 & (int8x16_t)vceqq_s8(sqx4, m2);
+            tsum += (int64_t)vaddlvq_s8(pos4);
+            tsum -= (int64_t)vaddlvq_s8(neg4);
+            
+            int8x16_t sqx5 = vreinterpretq_s8_u8(vandq_u8(qx5, m3));
+            int8x16_t neg5 = qy5 & (int8x16_t)vceqq_s8(sqx5, m0);
+            int8x16_t pos5 = qy5 & (int8x16_t)vceqq_s8(sqx5, m2);
+            tsum += (int64_t)vaddlvq_s8(pos5);
+            tsum -= (int64_t)vaddlvq_s8(neg5);
+            
+            int8x16_t sqx6 = vreinterpretq_s8_u8(vandq_u8(qx6, m3));
+            int8x16_t neg6 = qy6 & (int8x16_t)vceqq_s8(sqx6, m0);
+            int8x16_t pos6 = qy6 & (int8x16_t)vceqq_s8(sqx6, m2);
+            tsum += (int64_t)vaddlvq_s8(pos6);
+            tsum -= (int64_t)vaddlvq_s8(neg6);
+            
+            int8x16_t sqx7 = vreinterpretq_s8_u8(vandq_u8(qx7, m3));
+            int8x16_t neg7 = qy7 & (int8x16_t)vceqq_s8(sqx7, m0);
+            int8x16_t pos7 = qy7 & (int8x16_t)vceqq_s8(sqx7, m2);
+            tsum += (int64_t)vaddlvq_s8(pos7);
+            tsum -= (int64_t)vaddlvq_s8(neg7);
+
+        }
+        const float d = GGML_FP16_TO_FP32(x[i].d) * y[i].d;
+        sumf += d * (float) tsum;
+    }
+    *s = sumf;
+    return;
+#endif
     for (int i = 0; i < nb; ++i) {
 #if defined(__ARM_FEATURE_DOTPROD)
         int32x4_t sumi0 = vdupq_n_s32(0);
