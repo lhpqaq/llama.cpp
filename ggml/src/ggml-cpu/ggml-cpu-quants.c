@@ -4405,32 +4405,48 @@ void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
             // const int8x16_t qy7 = vld1q_s8(y[i].qs + j*4 + 112);
 
             int8x16_t sqx0 = vreinterpretq_s8_u8(vandq_u8(qx0, m3));
-            tsum -= (int64_t)vaddlvq_s8(qy0 & (int8x16_t)vceqq_s8(sqx0, m0));
-            tsum += (int64_t)vaddlvq_s8(qy0 & (int8x16_t)vceqq_s8(sqx0, m2));
+            tsum -= (int64_t)vaddlvq_s8(qy0 & (sqx0 == m0));
+            tsum += (int64_t)vaddlvq_s8(qy0 & (sqx0 == m2));
+
+            int8x16_t sqx2 = vreinterpretq_s8_u8(vandq_u8(qx2, m3));
+            tsum -= (int64_t)vaddlvq_s8(qy2 & (sqx2 == m0));
+            tsum += (int64_t)vaddlvq_s8(qy2 & (sqx2 == m2));
+
+            int8x16_t sqx4 = vreinterpretq_s8_u8(vandq_u8(qx4, m3));
+            tsum -= (int64_t)vaddlvq_s8(qy4 & (sqx4 == m0));
+            tsum += (int64_t)vaddlvq_s8(qy4 & (sqx4 == m2));
+
+            int8x16_t sqx6 = vreinterpretq_s8_u8(vandq_u8(qx6, m3));
+            tsum -= (int64_t)vaddlvq_s8(qy6 & (sqx6 == m0));
+            tsum += (int64_t)vaddlvq_s8(qy6 & (sqx6 == m2));
+
+            // int8x16_t sqx0 = vreinterpretq_s8_u8(vandq_u8(qx0, m3));
+            // tsum -= (int64_t)vaddlvq_s8(qy0 & (int8x16_t)vceqq_s8(sqx0, m0));
+            // tsum += (int64_t)vaddlvq_s8(qy0 & (int8x16_t)vceqq_s8(sqx0, m2));
             
             // int8x16_t sqx1 = vreinterpretq_s8_u8(vandq_u8(qx1, m3));
             // tsum -= (int64_t)vaddlvq_s8(qy1 & (int8x16_t)vceqq_s8(sqx1, m0));
             // tsum += (int64_t)vaddlvq_s8(qy1 & (int8x16_t)vceqq_s8(sqx1, m2));
             
-            int8x16_t sqx2 = vreinterpretq_s8_u8(vandq_u8(qx2, m3));
-            tsum -= (int64_t)vaddlvq_s8(qy2 & (int8x16_t)vceqq_s8(sqx2, m0));
-            tsum += (int64_t)vaddlvq_s8(qy2 & (int8x16_t)vceqq_s8(sqx2, m2));
+            // int8x16_t sqx2 = vreinterpretq_s8_u8(vandq_u8(qx2, m3));
+            // tsum -= (int64_t)vaddlvq_s8(qy2 & (int8x16_t)vceqq_s8(sqx2, m0));
+            // tsum += (int64_t)vaddlvq_s8(qy2 & (int8x16_t)vceqq_s8(sqx2, m2));
             
             // int8x16_t sqx3 = vreinterpretq_s8_u8(vandq_u8(qx3, m3));
             // tsum -= (int64_t)vaddlvq_s8(qy3 & (int8x16_t)vceqq_s8(sqx3, m0));
             // tsum += (int64_t)vaddlvq_s8(qy3 & (int8x16_t)vceqq_s8(sqx3, m2));
             
-            int8x16_t sqx4 = vreinterpretq_s8_u8(vandq_u8(qx4, m3));
-            tsum -= (int64_t)vaddlvq_s8(qy4 & (int8x16_t)vceqq_s8(sqx4, m0));
-            tsum += (int64_t)vaddlvq_s8(qy4 & (int8x16_t)vceqq_s8(sqx4, m2));
+            // int8x16_t sqx4 = vreinterpretq_s8_u8(vandq_u8(qx4, m3));
+            // tsum -= (int64_t)vaddlvq_s8(qy4 & (int8x16_t)vceqq_s8(sqx4, m0));
+            // tsum += (int64_t)vaddlvq_s8(qy4 & (int8x16_t)vceqq_s8(sqx4, m2));
             
             // int8x16_t sqx5 = vreinterpretq_s8_u8(vandq_u8(qx5, m3));
             // tsum -= (int64_t)vaddlvq_s8(qy5 & (int8x16_t)vceqq_s8(sqx5, m0));
             // tsum += (int64_t)vaddlvq_s8(qy5 & (int8x16_t)vceqq_s8(sqx5, m2));
             
-            int8x16_t sqx6 = vreinterpretq_s8_u8(vandq_u8(qx6, m3));
-            tsum -= (int64_t)vaddlvq_s8(qy6 & (int8x16_t)vceqq_s8(sqx6, m0));
-            tsum += (int64_t)vaddlvq_s8(qy6 & (int8x16_t)vceqq_s8(sqx6, m2));
+            // int8x16_t sqx6 = vreinterpretq_s8_u8(vandq_u8(qx6, m3));
+            // tsum -= (int64_t)vaddlvq_s8(qy6 & (int8x16_t)vceqq_s8(sqx6, m0));
+            // tsum += (int64_t)vaddlvq_s8(qy6 & (int8x16_t)vceqq_s8(sqx6, m2));
             
             // int8x16_t sqx7 = vreinterpretq_s8_u8(vandq_u8(qx7, m3));
             // tsum -= (int64_t)vaddlvq_s8(qy7 & (int8x16_t)vceqq_s8(sqx7, m0));
