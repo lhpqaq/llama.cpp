@@ -4345,6 +4345,42 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 
 void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     // hptodo
+    assert(nrc == 1);
+    UNUSED(nrc);
+    UNUSED(bx);
+    UNUSED(by);
+    UNUSED(bs);
+
+    const block_tq2_m * GGML_RESTRICT x = vx;
+    const block_q8_K  * GGML_RESTRICT y = vy;
+
+    const int nb = n / QK_K;
+    float sumf = 0.0f;
+
+    for (int i = 0; i < nb; ++i) {
+        int32_t sumi = 0;
+
+        for (int j = 0; j < QK_K / 8; ++j) {
+            uint8_t qp = x[i].qp[j];
+            uint8_t qn = x[i].qn[j];
+
+            for (int b = 0; b < 8; ++b) {
+                int idx = j * 8 + b;
+                int8_t q = y[i].qs[idx];
+
+                if ((qp >> b) & 1) {
+                    sumi += q;
+                } else if ((qn >> b) & 1) {
+                    sumi -= q;
+                }
+            }
+        }
+
+        float d = GGML_FP16_TO_FP32(x[i].d) * GGML_FP16_TO_FP32(y[i].d);
+        sumf += (float) sumi * d;
+    }
+
+    *s = sumf;
 }
 
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
