@@ -625,34 +625,47 @@ class TQ2_M(__Quant, qtype=GGMLQuantizationType.TQ2_M):
     # hptodo
     @classmethod
     def quantize_blocks(cls, blocks: np.ndarray) -> np.ndarray:
-        n_blocks = blocks.shape[0]
+        n_blocks, block_size = blocks.shape
+        d = np.max(np.abs(blocks), axis=-1, keepdims=True).astype(np.float32)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            id = np.where(d == 0, 0.0, 1.0 / d)
 
-        d = abs(blocks).max(axis=-1, keepdims=True)
-        with np.errstate(divide="ignore"):
-            id = np.where(d == 0, 0, 1 / d)
-        qs = np_roundf(blocks * id)
-        qs = (qs.astype(np.int8) + np.int8(1)).astype(np.uint8)
+        # 标准化后取符号，三值 {-1, 0, +1}
+        norm = blocks * id
+        norm = np.round(norm).astype(np.int8)
+        norm = np.clip(norm, -1, 1)
 
-        qs = qs.reshape((n_blocks, -1, 4, 32)) << np.array([0, 2, 4, 6], dtype=np.uint8).reshape((1, 1, 4, 1))
-        qs = qs[..., 0, :] | qs[..., 1, :] | qs[..., 2, :] | qs[..., 3, :]
-        qs = qs.reshape((n_blocks, -1))
+        qp = np.zeros((n_blocks, block_size // 8), dtype=np.uint8)
+        qn = np.zeros_like(qp)
+
+        for i in range(8):
+            bit = 1 << i
+            idx = np.arange(i, block_size, 8)
+            mask = norm[:, idx]
+            qp[:, :] |= ((mask == 1).astype(np.uint8) << i)
+            qn[:, :] |= ((mask == -1).astype(np.uint8) << i)
 
         d = d.astype(np.float16).view(np.uint8)
-
-        return np.concatenate([qs, d], axis=-1)
+        return np.concatenate([qp, qn, d], axis=-1)
 
     @classmethod
     def dequantize_blocks(cls, blocks: np.ndarray) -> np.ndarray:
         n_blocks = blocks.shape[0]
+        half_block = (QK_K // 8)  # qp 长度（每 8 个值 1 字节）
 
-        qs, d = np.hsplit(blocks, [QK_K // 4])
+        qp = blocks[:, :half_block]
+        qn = blocks[:, half_block:2 * half_block]
+        d = blocks[:, 2 * half_block:].view(np.float16).astype(np.float32)
 
-        d = d.view(np.float16).astype(np.float32)
+        out = np.zeros((n_blocks, QK_K), dtype=np.float32)
+        for i in range(8):
+            bit = 1 << i
+            mask_p = ((qp & bit) >> i).astype(np.float32)
+            mask_n = ((qn & bit) >> i).astype(np.float32)
+            val = mask_p - mask_n  # +1, 0, -1
+            out[:, i::8] = val
 
-        qs = qs.reshape((n_blocks, -1, 1, 32)) >> np.array([0, 2, 4, 6], dtype=np.uint8).reshape((1, 1, 4, 1))
-        qs = (qs & 0x03).reshape((n_blocks, -1)).astype(np.int8) - np.int8(1)
-
-        return (d * qs.astype(np.float32))
+        return out * d
     
 class TQ2_0(__Quant, qtype=GGMLQuantizationType.TQ2_0):
     @classmethod

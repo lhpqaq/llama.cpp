@@ -2088,8 +2088,39 @@ void quantize_row_tq1_0_ref(const float * GGML_RESTRICT x, block_tq1_0 * GGML_RE
     }
 }
 
-void quantize_row_m_ref(const float * GGML_RESTRICT x, block_tq2_m * GGML_RESTRICT y, int64_t k) {
-    //hptodo
+void quantize_row_tq2_m_ref(const float * GGML_RESTRICT x, block_tq2_m * GGML_RESTRICT y, int64_t k) {
+    // hptodo
+    assert(k % QK_K == 0);
+    const int64_t nb = k / QK_K;
+
+    for (int64_t i = 0; i < nb; i++) {
+        float amax = 0.0f; // absolute max
+
+        for (int j = 0; j < QK_K; j++) {
+            const float v = x[j];
+            amax = MAX(amax, fabsf(v));
+        }
+
+        const float d = amax;
+        const float id = d ? 1.0f/d : 0.0f;
+
+        y[i].d = GGML_FP32_TO_FP16(d);
+
+        for (size_t j = 0; j < sizeof(y->qp); ++j) {
+            uint8_t qp = 0, qn = 0;
+            for (int n = 0; n < 8; ++n) {
+                int xi = lroundf(x[n] * id);
+                if (xi > 0) {
+                    qp |= (1 << n);
+                } else if (xi < 0) {
+                    qn |= (1 << n);
+                }
+            }
+            y[i].qp[j] = qp;
+            y[i].qn[j] = qn;
+            x += 8;
+        }
+    }
 }
 
 void quantize_row_tq2_0_ref(const float * GGML_RESTRICT x, block_tq2_0 * GGML_RESTRICT y, int64_t k) {
@@ -2208,6 +2239,19 @@ void dequantize_row_tq2_m(const block_tq2_m * GGML_RESTRICT x, float * GGML_REST
     const int64_t nb = k / QK_K;
 
     // hptodo
+    const float d = GGML_FP16_TO_FP32(x->d);
+
+    for (size_t j = 0; j < sizeof(x->qp); ++j) {
+        uint8_t qp = x->qp[j];
+        uint8_t qn = x->qn[j];
+
+        for (int n = 0; n < 8; ++n) {
+            float v = 0.0f;
+            if (qp & (1 << n)) v = +1.0f;
+            else if (qn & (1 << n)) v = -1.0f;
+            *y++ = v * d;
+        }
+    }
 }
 
 // ====================== "True" 2-bit (de)-quantization
