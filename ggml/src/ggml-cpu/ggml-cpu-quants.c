@@ -4375,8 +4375,7 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
                 }
             }
         }
-
-        float d = GGML_FP16_TO_FP32(x[i].d) * GGML_FP16_TO_FP32(y[i].d);
+        float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
         sumf += (float) sumi * d;
     }
 
