@@ -4365,14 +4365,8 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
             uint8_t qn = x[i].qn[j];
 
             for (int b = 0; b < 8; ++b) {
-                int idx = j * 8 + b;
-                int8_t q = y[i].qs[idx];
-
-                if ((qp >> b) & 1) {
-                    sumi += q;
-                } else if ((qn >> b) & 1) {
-                    sumi -= q;
-                }
+                int32_t q = (int32_t) y[i].qs[j * 8 + b];
+                sumi += q * (((qp >> b) & 1 ) - ((qn >> b) & 1));
             }
         }
         float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
@@ -4382,6 +4376,7 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     *s = sumf;
 }
 
+#undef __ARM_NEON
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     assert(nrc == 1);
     UNUSED(nrc);
