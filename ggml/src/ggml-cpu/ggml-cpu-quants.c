@@ -1745,6 +1745,13 @@ void quantize_row_tq2_m(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, 
     quantize_row_tq2_m_ref(x, y, k);
 }
 
+void quantize_row_tq2_n(const float * GGML_RESTRICT x, void * GGML_RESTRICT vy, int64_t k) {
+    assert(k % QK_K == 0);
+    block_tq2_n * GGML_RESTRICT y = vy;
+    quantize_row_tq2_n_ref(x, y, k);
+}
+
+
 static const int8_t kvalues_iq4nl[16] = {-127, -104, -83, -65, -49, -35, -22, -10, 1, 13, 25, 38, 53, 69, 89, 113};
 
 //===================================== Q8_K ==============================================
@@ -4566,6 +4573,38 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 #endif
 }
 
+
+void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
+    // hptodon
+    assert(nrc == 1);
+    UNUSED(nrc);
+    UNUSED(bx);
+    UNUSED(by);
+    UNUSED(bs);
+
+    const block_tq2_n * GGML_RESTRICT x = vx;
+    const block_q8_K  * GGML_RESTRICT y = vy;
+
+    const int nb = n / QK_K;
+    float sumf = 0.0f;
+    for (int i = 0; i < nb; ++i) {
+        int32_t sumi = 0;
+
+        for (int j = 0; j < QK_K / 4; j += 2) {
+            uint8_t qp = x[i].qs[j];
+            uint8_t qn = x[i].qs[j + 1];
+
+            for (int b = 0; b < 8; ++b) {
+                int8_t q = (int32_t) y[i].qs[j * 4 + b];
+                // sumi += q & (int32_t) ((((qp >> b) & 1 ) - ((qn >> b) & 1)) & 0xFFFFFFFE);
+                sumi += q * (((qp >> b) & 1 ) - ((qn >> b) & 1));
+            }
+        }
+        float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
+        sumf += (float) sumi * d;
+    }
+    *s = sumf;
+}
 #undef __ARM_NEON
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     assert(nrc == 1);

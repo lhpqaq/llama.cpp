@@ -181,7 +181,7 @@ static ggml_type llama_tensor_get_type(quantize_state_impl & qs, ggml_type new_t
             else if (ftype == LLAMA_FTYPE_MOSTLY_IQ3_XXS) {
                 new_type = GGML_TYPE_IQ3_S;
             }
-            else if (ftype == LLAMA_FTYPE_MOSTLY_TQ1_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_M) {
+            else if (ftype == LLAMA_FTYPE_MOSTLY_TQ1_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_0 || ftype == LLAMA_FTYPE_MOSTLY_TQ2_M || ftype == LLAMA_FTYPE_MOSTLY_TQ2_N) {
                 new_type = GGML_TYPE_Q4_K;
             }
         }
@@ -384,7 +384,8 @@ static ggml_type llama_tensor_get_type(quantize_state_impl & qs, ggml_type new_t
         switch (new_type) {
             case GGML_TYPE_TQ1_0:
             case GGML_TYPE_TQ2_0:
-            case GGML_TYPE_TQ2_M:  new_type = GGML_TYPE_Q4_0; break;  // TODO: use a symmetric type instead
+            case GGML_TYPE_TQ2_M:
+            case GGML_TYPE_TQ2_N:  new_type = GGML_TYPE_Q4_0; break;  // TODO: use a symmetric type instead
             case GGML_TYPE_IQ2_XXS:
             case GGML_TYPE_IQ2_XS:
             case GGML_TYPE_IQ2_S:
@@ -493,6 +494,7 @@ static void llama_model_quantize_impl(const std::string & fname_inp, const std::
         case LLAMA_FTYPE_MOSTLY_TQ1_0:   default_type = GGML_TYPE_TQ1_0;   break;
         case LLAMA_FTYPE_MOSTLY_TQ2_0:   default_type = GGML_TYPE_TQ2_0;   break;
         case LLAMA_FTYPE_MOSTLY_TQ2_M:   default_type = GGML_TYPE_TQ2_M;   break;
+        case LLAMA_FTYPE_MOSTLY_TQ2_N:   default_type = GGML_TYPE_TQ2_N;   break;
         case LLAMA_FTYPE_MOSTLY_IQ2_XXS: default_type = GGML_TYPE_IQ2_XXS; break;
         case LLAMA_FTYPE_MOSTLY_IQ2_XS:  default_type = GGML_TYPE_IQ2_XS;  break;
         case LLAMA_FTYPE_MOSTLY_IQ2_S:   default_type = GGML_TYPE_IQ2_XS;  break;

@@ -2088,6 +2088,41 @@ void quantize_row_tq1_0_ref(const float * GGML_RESTRICT x, block_tq1_0 * GGML_RE
     }
 }
 
+void quantize_row_tq2_n_ref(const float * GGML_RESTRICT x, block_tq2_n * GGML_RESTRICT y, int64_t k) {
+    //hptodon
+    assert(k % QK_K == 0);
+    const int64_t nb = k / QK_K;
+
+    for (int64_t i = 0; i < nb; i++) {
+        float amax = 0.0f; // absolute max
+
+        for (int j = 0; j < QK_K; j++) {
+            const float v = x[j];
+            amax = MAX(amax, fabsf(v));
+        }
+
+        const float d = amax;
+        const float id = d ? 1.0f/d : 0.0f;
+
+        y[i].d = GGML_FP32_TO_FP16(d);
+
+        for (size_t j = 0; j < sizeof(y->qs); j += 2) {
+            uint8_t qp = 0, qn = 0;
+            for (int n = 0; n < 8; ++n) {
+                int xi = lroundf(x[n] * id);
+                if (xi > 0) {
+                    qp |= (1 << n);
+                } else if (xi < 0) {
+                    qn |= (1 << n);
+                }
+            }
+            y[i].qs[j] = qp;
+            y[i].qs[j + 1] = qn;
+            x += 8;
+        }
+    }
+}
+
 void quantize_row_tq2_m_ref(const float * GGML_RESTRICT x, block_tq2_m * GGML_RESTRICT y, int64_t k) {
     // hptodo
     assert(k % QK_K == 0);
@@ -2176,6 +2211,13 @@ size_t quantize_tq2_m(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst,
     return nrow * row_size;
 }
 
+size_t quantize_tq2_n(const float * GGML_RESTRICT src, void * GGML_RESTRICT dst, int64_t nrow, int64_t n_per_row, const float * quant_weights) {
+    (void)quant_weights; // not used
+    const size_t row_size = ggml_row_size(GGML_TYPE_TQ2_N, n_per_row);
+    quantize_row_tq2_n_ref(src, dst, (int64_t)nrow*n_per_row);
+    return nrow * row_size;
+}
+
 void dequantize_row_tq1_0(const block_tq1_0 * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
@@ -2254,6 +2296,27 @@ void dequantize_row_tq2_m(const block_tq2_m * GGML_RESTRICT x, float * GGML_REST
     }
 }
 
+
+void dequantize_row_tq2_n(const block_tq2_n * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
+    //hptodon
+    assert(k % QK_K == 0);
+    const int64_t nb = k / QK_K;
+
+    // hptodo
+    const float d = GGML_FP16_TO_FP32(x->d);
+
+    for (size_t j = 0; j < sizeof(x->qs); j += 2) {
+        uint8_t qp = x->qs[j];
+        uint8_t qn = x->qs[j + 1];
+
+        for (int n = 0; n < 8; ++n) {
+            float v = 0.0f;
+            if (qp & (1 << n)) v = +1.0f;
+            else if (qn & (1 << n)) v = -1.0f;
+            *y++ = v * d;
+        }
+    }
+}
 // ====================== "True" 2-bit (de)-quantization
 
 void dequantize_row_iq2_xxs(const block_iq2_xxs * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
@@ -5240,6 +5303,10 @@ bool ggml_validate_row_data(enum ggml_type type, const void * data, size_t nbyte
         case GGML_TYPE_TQ2_M:
             {
                 VALIDATE_ROW_DATA_D_F16_IMPL(block_tq2_m, data, nb);
+            } break;
+        case GGML_TYPE_TQ2_N:
+            {
+                VALIDATE_ROW_DATA_D_F16_IMPL(block_tq2_n, data, nb);
             } break;
         case GGML_TYPE_IQ1_S:
             {
