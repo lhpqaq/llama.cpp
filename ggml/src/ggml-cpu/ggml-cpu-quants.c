@@ -4357,27 +4357,51 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     const int nb = n / QK_K;
     float sumf = 0.0f;
 #if defined(__AVX512F__)
+// #if defined(__AVX512BW__) && defined(__AVX512VL__)
+//     for (int i = 0; i < nb; ++i) {
+//         char _mm_mask_reduce_add_epi8 
+//     }
+// #else
     for (int i = 0; i < nb; ++i) {
         int32_t sumi = 0;
 
         uint16_t *qp16 = (uint16_t *) x[i].qp;
         uint16_t *qn16 = (uint16_t *) x[i].qn;
-        for (int j = 0; j < QK_K / 16; j += 1) {
-            __m128i y_qs = _mm_loadu_si128((const __m128i*)(y[i].qs + j * 16));
-            __m512i y_vec = _mm512_cvtepi8_epi32(y_qs);
+        for (int j = 0; j < QK_K / 16; j += 4) {
+            __m128i qs0 = _mm_loadu_si128((const __m128i*)(y[i].qs + j * 16));
+            __m128i qs1 = _mm_loadu_si128((const __m128i*)(y[i].qs + (j + 1) * 16));
+            __m128i qs2 = _mm_loadu_si128((const __m128i*)(y[i].qs + (j + 2) * 16));
+            __m128i qs3 = _mm_loadu_si128((const __m128i*)(y[i].qs + (j + 3) * 16));
+            __m512i y0 = _mm512_cvtepi8_epi32(qs0);
+            __m512i y1 = _mm512_cvtepi8_epi32(qs1);
+            __m512i y2 = _mm512_cvtepi8_epi32(qs2);
+            __m512i y3 = _mm512_cvtepi8_epi32(qs3);
             
             // 获取16位掩码
-            __mmask16 mask_p = _cvtu32_mask16(qp16[j]);
-            __mmask16 mask_n = _cvtu32_mask16(qn16[j]);
+            __mmask16 p0 = _mm512_int2mask(qp16[j]);
+            __mmask16 p1 = _mm512_int2mask(qp16[j + 1]);
+            __mmask16 p2 = _mm512_int2mask(qp16[j + 2]);
+            __mmask16 p3 = _mm512_int2mask(qp16[j + 3]);
+            __mmask16 n0 = _mm512_int2mask(qn16[j]);
+            __mmask16 n1 = _mm512_int2mask(qn16[j + 1]);
+            __mmask16 n2 = _mm512_int2mask(qn16[j + 2]);
+            __mmask16 n3 = _mm512_int2mask(qn16[j + 3]);
             
             // 累加正贡献，减去负贡献
-            sumi += _mm512_mask_reduce_add_epi32(mask_p, y_vec);
-            sumi -= _mm512_mask_reduce_add_epi32(mask_n, y_vec);
+            sumi += _mm512_mask_reduce_add_epi32(p0, y0);
+            sumi -= _mm512_mask_reduce_add_epi32(n0, y0);
+            sumi += _mm512_mask_reduce_add_epi32(p1, y1);
+            sumi -= _mm512_mask_reduce_add_epi32(n1, y1);
+            sumi += _mm512_mask_reduce_add_epi32(p2, y2);
+            sumi -= _mm512_mask_reduce_add_epi32(n2, y2);
+            sumi += _mm512_mask_reduce_add_epi32(p3, y3);
+            sumi -= _mm512_mask_reduce_add_epi32(n3, y3);
         }
         float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
         sumf += (float)sumi * d;
     }
     *s = sumf;
+// #endif
 #else
     for (int i = 0; i < nb; ++i) {
         int32_t sumi = 0;
