@@ -4348,6 +4348,8 @@ void ggml_vec_dot_tq1_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 #undef __AVX__
 #undef __AVX512BW__
 
+#define BLOCK_SIZE 4
+
 void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     // hptodo
     assert(nrc == 1);
@@ -4452,27 +4454,119 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     *s = sumf;
 #endif
 #else
-    for (int i = 0; i < nb; ++i) {
-        int32_t sumi = 0;
+    // for (int i = 0; i < nb; ++i) {
+    //     int32_t sumi = 0;
 
-        for (int j = 0; j < QK_K / 8; ++j) {
-            uint8_t qp = x[i].qp[j];
-            uint8_t qn = x[i].qn[j];
+    //     for (int j = 0; j < QK_K / 8; ++j) {
+    //         uint8_t qp = x[i].qp[j];
+    //         uint8_t qn = x[i].qn[j];
+    //         // size_t idx =  j * 8;
+    //         // int8_t q0 = (int32_t) y[i].qs[idx];
+    //         // int8_t q1 = (int32_t) y[i].qs[idx + 1];
+    //         // int8_t q2 = (int32_t) y[i].qs[idx + 2];
+    //         // int8_t q3 = (int32_t) y[i].qs[idx + 3];
+    //         // int8_t q4 = (int32_t) y[i].qs[idx + 4];
+    //         // int8_t q5 = (int32_t) y[i].qs[idx + 5];
+    //         // int8_t q6 = (int32_t) y[i].qs[idx + 6];
+    //         // int8_t q7 = (int32_t) y[i].qs[idx + 7];
+            
+    //         // sumi += q0 * ((qp & 1) - (qn & 1));
+    //         // sumi += q1 * ((qp & 2) - (qn & 2));
+    //         // sumi += q2 * ((qp & 4) - (qn & 4));
+    //         // sumi += q3 * ((qp & 8) - (qn & 8));
+    //         // sumi += q4 * ((qp & 16) - (qn & 16));
+    //         // sumi += q5 * ((qp & 32) - (qn & 32));
+    //         // sumi += q6 * ((qp & 64) - (qn & 64));
+    //         // sumi += q7 * ((qp & 128) - (qn & 128));
+    //         // for (int b = 0; b < 8; ++b) {
+    //         //     int8_t q = (int32_t) y[i].qs[j * 8 + b];
+    //         //     // sumi += q & (int32_t) ((((qp >> b) & 1 ) - ((qn >> b) & 1)) & 0xFFFFFFFE);
+    //         //     sumi += q * (((qp >> b) & 1 ) - ((qn >> b) & 1));
+    //         // }
+    //     }
+    //     float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
+    //     sumf += (float) sumi * d;
+    // }
 
-            for (int b = 0; b < 8; ++b) {
-                int32_t q = (int32_t) y[i].qs[j * 8 + b];
-                sumi += q * (((qp >> b) & 1 ) - ((qn >> b) & 1));
-            }
+    for (int i_block = 0; i_block < nb; i_block += BLOCK_SIZE) {
+        int end_i = i_block + BLOCK_SIZE < nb ? i_block + BLOCK_SIZE : nb;
+
+        // 预取下一个块的数据
+        if (i_block + BLOCK_SIZE < nb) {
+            __builtin_prefetch(&x[i_block + BLOCK_SIZE], 0);
+            __builtin_prefetch(&y[i_block + BLOCK_SIZE], 0);
         }
-        float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
-        sumf += (float) sumi * d;
-    }
 
+        for (int i = i_block; i < end_i; ++i) {
+            int32_t sumi = 0;
+
+            for (int j = 0; j < QK_K / 8; j += 4) {
+                int32_t sumi0 = 0, sumi1 = 0, sumi2 = 0, sumi3 = 0;
+
+                // 处理 j+0
+                uint8_t qp0 = x[i].qp[j];
+                uint8_t qn0 = x[i].qn[j];
+                const int8_t* qs0 = &y[i].qs[j * 8];
+                sumi0 += qs0[0] * (((qp0 >> 0) & 1) - ((qn0 >> 0) & 1));
+                sumi0 += qs0[1] * (((qp0 >> 1) & 1) - ((qn0 >> 1) & 1));
+                sumi0 += qs0[2] * (((qp0 >> 2) & 1) - ((qn0 >> 2) & 1));
+                sumi0 += qs0[3] * (((qp0 >> 3) & 1) - ((qn0 >> 3) & 1));
+                sumi0 += qs0[4] * (((qp0 >> 4) & 1) - ((qn0 >> 4) & 1));
+                sumi0 += qs0[5] * (((qp0 >> 5) & 1) - ((qn0 >> 5) & 1));
+                sumi0 += qs0[6] * (((qp0 >> 6) & 1) - ((qn0 >> 6) & 1));
+                sumi0 += qs0[7] * (((qp0 >> 7) & 1) - ((qn0 >> 7) & 1));
+
+                // 处理 j+1
+                uint8_t qp1 = x[i].qp[j + 1];
+                uint8_t qn1 = x[i].qn[j + 1];
+                const int8_t* qs1 = &y[i].qs[(j + 1) * 8];
+                sumi1 += qs1[0] * (((qp1 >> 0) & 1) - ((qn1 >> 0) & 1));
+                sumi1 += qs1[1] * (((qp1 >> 1) & 1) - ((qn1 >> 1) & 1));
+                sumi1 += qs1[2] * (((qp1 >> 2) & 1) - ((qn1 >> 2) & 1));
+                sumi1 += qs1[3] * (((qp1 >> 3) & 1) - ((qn1 >> 3) & 1));
+                sumi1 += qs1[4] * (((qp1 >> 4) & 1) - ((qn1 >> 4) & 1));
+                sumi1 += qs1[5] * (((qp1 >> 5) & 1) - ((qn1 >> 5) & 1));
+                sumi1 += qs1[6] * (((qp1 >> 6) & 1) - ((qn1 >> 6) & 1));
+                sumi1 += qs1[7] * (((qp1 >> 7) & 1) - ((qn1 >> 7) & 1));
+
+                // 处理 j+2
+                uint8_t qp2 = x[i].qp[j + 2];
+                uint8_t qn2 = x[i].qn[j + 2];
+                const int8_t* qs2 = &y[i].qs[(j + 2) * 8];
+                sumi2 += qs2[0] * (((qp2 >> 0) & 1) - ((qn2 >> 0) & 1));
+                sumi2 += qs2[1] * (((qp2 >> 1) & 1) - ((qn2 >> 1) & 1));
+                sumi2 += qs2[2] * (((qp2 >> 2) & 1) - ((qn2 >> 2) & 1));
+                sumi2 += qs2[3] * (((qp2 >> 3) & 1) - ((qn2 >> 3) & 1));
+                sumi2 += qs2[4] * (((qp2 >> 4) & 1) - ((qn2 >> 4) & 1));
+                sumi2 += qs2[5] * (((qp2 >> 5) & 1) - ((qn2 >> 5) & 1));
+                sumi2 += qs2[6] * (((qp2 >> 6) & 1) - ((qn2 >> 6) & 1));
+                sumi2 += qs2[7] * (((qp2 >> 7) & 1) - ((qn2 >> 7) & 1));
+
+                // 处理 j+3
+                uint8_t qp3 = x[i].qp[j + 3];
+                uint8_t qn3 = x[i].qn[j + 3];
+                const int8_t* qs3 = &y[i].qs[(j + 3) * 8];
+                sumi3 += qs3[0] * (((qp3 >> 0) & 1) - ((qn3 >> 0) & 1));
+                sumi3 += qs3[1] * (((qp3 >> 1) & 1) - ((qn3 >> 1) & 1));
+                sumi3 += qs3[2] * (((qp3 >> 2) & 1) - ((qn3 >> 2) & 1));
+                sumi3 += qs3[3] * (((qp3 >> 3) & 1) - ((qn3 >> 3) & 1));
+                sumi3 += qs3[4] * (((qp3 >> 4) & 1) - ((qn3 >> 4) & 1));
+                sumi3 += qs3[5] * (((qp3 >> 5) & 1) - ((qn3 >> 5) & 1));
+                sumi3 += qs3[6] * (((qp3 >> 6) & 1) - ((qn3 >> 6) & 1));
+                sumi3 += qs3[7] * (((qp3 >> 7) & 1) - ((qn3 >> 7) & 1));
+
+                sumi += sumi0 + sumi1 + sumi2 + sumi3;
+            }
+
+            float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
+            sumf += (float)sumi * d;
+        }
+    }
     *s = sumf;
 #endif
 }
 
-
+#undef __ARM_NEON
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     assert(nrc == 1);
     UNUSED(nrc);
