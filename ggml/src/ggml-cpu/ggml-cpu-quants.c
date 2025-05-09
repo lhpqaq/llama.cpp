@@ -4356,7 +4356,29 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 
     const int nb = n / QK_K;
     float sumf = 0.0f;
+#if defined(__AVX512F__)
+    for (int i = 0; i < nb; ++i) {
+        int32_t sumi = 0;
 
+        uint16_t *qp16 = (uint16_t *) x[i].qp;
+        uint16_t *qn16 = (uint16_t *) x[i].qn;
+        for (int j = 0; j < QK_K / 16; j += 1) {
+            __m128i y_qs = _mm_loadu_si128((const __m128i*)(y[i].qs + j * 16));
+            __m512i y_vec = _mm512_cvtepi8_epi32(y_qs);
+            
+            // 获取16位掩码
+            __mmask16 mask_p = _cvtu32_mask16(qp16[j]);
+            __mmask16 mask_n = _cvtu32_mask16(qn16[j]);
+            
+            // 累加正贡献，减去负贡献
+            sumi += _mm512_mask_reduce_add_epi32(mask_p, y_vec);
+            sumi -= _mm512_mask_reduce_add_epi32(mask_n, y_vec);
+        }
+        float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
+        sumf += (float)sumi * d;
+    }
+    *s = sumf;
+#else
     for (int i = 0; i < nb; ++i) {
         int32_t sumi = 0;
 
@@ -4374,6 +4396,7 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     }
 
     *s = sumf;
+#endif
 }
 
 #undef __ARM_NEON
