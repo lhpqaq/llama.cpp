@@ -4589,11 +4589,31 @@ void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     float sumf = 0.0f;
     for (int i = 0; i < nb; ++i) {
         int32_t sumi = 0;
-        for (int j = 0; j < QK_K / 4; j += 2) {
+        for (int j = 0; j < QK_K / 4; j += 4) {
             uint8_t qp = x[i].qs[j];
-            uint8_t qn = x[i].qs[j + 1];
+            uint8_t qn = x[i].qs[j + 2];
             const int8_t *q = y[i].qs + j * 4;
-            
+
+            sumi += q[0] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[1] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[2] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[3] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[4] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[5] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[6] * ((qp & 1 ) - (qn & 1));
+            qp >>= 1, qn >>= 1;
+            sumi += q[7] * ((qp & 1 ) - (qn & 1));
+
+            q += 8;
+            qp = x[i].qs[j + 1];
+            qn = x[i].qs[j + 3];
+
             sumi += q[0] * ((qp & 1 ) - (qn & 1));
             qp >>= 1, qn >>= 1;
             sumi += q[1] * ((qp & 1 ) - (qn & 1));
