@@ -4588,50 +4588,41 @@ void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     const int nb = n / QK_K;
     float sumf = 0.0f;
     for (int i = 0; i < nb; ++i) {
-        int32_t sumi = 0;
+        int32_t sumi0 = 0, sumi1 = 0;
         for (int j = 0; j < QK_K / 4; j += 4) {
-            uint8_t qp = x[i].qs[j];
-            uint8_t qn = x[i].qs[j + 2];
-            const int8_t *q = y[i].qs + j * 4;
+            uint8_t qp0 = x[i].qs[j];
+            uint8_t qp1 = x[i].qs[j + 1];
+            uint8_t qn0 = x[i].qs[j + 2];
+            uint8_t qn1 = x[i].qs[j + 3];
+            const int8_t *q0 = y[i].qs + j * 4;
+            const int8_t *q1 = q0 + 8;
 
-            sumi += q[0] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[1] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[2] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[3] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[4] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[5] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[6] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[7] * ((qp & 1 ) - (qn & 1));
-
-            q += 8;
-            qp = x[i].qs[j + 1];
-            qn = x[i].qs[j + 3];
-
-            sumi += q[0] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[1] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[2] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[3] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[4] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[5] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[6] * ((qp & 1 ) - (qn & 1));
-            qp >>= 1, qn >>= 1;
-            sumi += q[7] * ((qp & 1 ) - (qn & 1));
+            sumi0 += q0[0] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[0] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[1] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[1] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[2] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[2] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[3] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[3] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[4] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[4] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[5] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[5] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[6] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[6] * ((qp1 & 1 ) - (qn1 & 1));
+            qp0 >>= 1, qn0 >>= 1, qp1 >>= 1, qn1 >>= 1;
+            sumi0 += q0[7] * ((qp0 & 1 ) - (qn0 & 1));
+            sumi1 += q1[7] * ((qp1 & 1 ) - (qn1 & 1));
         }
         float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
-        sumf += (float) sumi * d;
+        sumf += (float) (sumi0 + sumi1) * d;
     }
     *s = sumf;
 }
