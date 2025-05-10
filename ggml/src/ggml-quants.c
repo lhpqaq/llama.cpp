@@ -2106,7 +2106,7 @@ void quantize_row_tq2_n_ref(const float * GGML_RESTRICT x, block_tq2_n * GGML_RE
 
         y[i].d = GGML_FP32_TO_FP16(d);
 
-        for (size_t j = 0; j < sizeof(y->qs); j += 4) {
+        for (size_t j = 0; j < sizeof(y->qs); j += 2) {
             uint8_t qp = 0, qn = 0;
             for (int n = 0; n < 8; ++n) {
                 int xi = lroundf(x[n] * id);
@@ -2117,19 +2117,7 @@ void quantize_row_tq2_n_ref(const float * GGML_RESTRICT x, block_tq2_n * GGML_RE
                 }
             }
             y[i].qs[j] = qp;
-            y[i].qs[j + 2] = qn;
-            x += 8;
-            qp = 0, qn = 0;
-            for (int n = 0; n < 8; ++n) {
-                int xi = lroundf(x[n] * id);
-                if (xi > 0) {
-                    qp |= (1 << n);
-                } else if (xi < 0) {
-                    qn |= (1 << n);
-                }
-            }
-            y[i].qs[j + 1] = qp;
-            y[i].qs[j + 3] = qn;
+            y[i].qs[j + 1] = qn;
             x += 8;
         }
     }
@@ -2317,18 +2305,9 @@ void dequantize_row_tq2_n(const block_tq2_n * GGML_RESTRICT x, float * GGML_REST
     // hptodo
     const float d = GGML_FP16_TO_FP32(x->d);
 
-    for (size_t j = 0; j < sizeof(x->qs); j += 4) {
+    for (size_t j = 0; j < sizeof(x->qs); j += 2) {
         uint8_t qp = x->qs[j];
-        uint8_t qn = x->qs[j + 2];
-
-        for (int n = 0; n < 8; ++n) {
-            float v = 0.0f;
-            if (qp & (1 << n)) v = +1.0f;
-            else if (qn & (1 << n)) v = -1.0f;
-            *y++ = v * d;
-        }
-        qp = x->qs[j + 1];
-        qn = x->qs[j + 3];
+        uint8_t qn = x->qs[j + 1];
 
         for (int n = 0; n < 8; ++n) {
             float v = 0.0f;
