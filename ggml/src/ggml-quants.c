@@ -2089,7 +2089,7 @@ void quantize_row_tq1_0_ref(const float * GGML_RESTRICT x, block_tq1_0 * GGML_RE
 }
 
 void quantize_row_tq2_n_ref(const float * GGML_RESTRICT x, block_tq2_n * GGML_RESTRICT y, int64_t k) {
-    //hptodon
+    // hptodon
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
@@ -2106,19 +2106,24 @@ void quantize_row_tq2_n_ref(const float * GGML_RESTRICT x, block_tq2_n * GGML_RE
 
         y[i].d = GGML_FP32_TO_FP16(d);
 
-        for (size_t j = 0; j < sizeof(y->qs); j += 2) {
-            uint8_t qp = 0, qn = 0;
+        for (size_t j = 0; j < sizeof(y->qs); j += 32) {
+            uint8_t qp[16] = {0}, qn[16] = {0};
             for (int n = 0; n < 8; ++n) {
-                int xi = lroundf(x[n] * id);
-                if (xi > 0) {
-                    qp |= (1 << n);
-                } else if (xi < 0) {
-                    qn |= (1 << n);
+                size_t idx = 16 * n;
+                for (int b = 0; b < 16; b++) {
+                    int xi = lroundf(x[idx + b] * id);
+                    if (xi > 0) {
+                        qp[b] |= (1 << n);
+                    } else if (xi < 0) {
+                        qn[b] |= (1 << n);
+                    }
                 }
             }
-            y[i].qs[j] = qp;
-            y[i].qs[j + 1] = qn;
-            x += 8;
+            for (int b = 0; b < 32; b += 2) {
+                y[i].qs[j + b] = qp[b / 2];
+                y[i].qs[j + b + 1] = qn[b / 2];
+            }
+            x += 128;
         }
     }
 }
@@ -2298,22 +2303,24 @@ void dequantize_row_tq2_m(const block_tq2_m * GGML_RESTRICT x, float * GGML_REST
 
 
 void dequantize_row_tq2_n(const block_tq2_n * GGML_RESTRICT x, float * GGML_RESTRICT y, int64_t k) {
-    //hptodon
+    // hptodon
     assert(k % QK_K == 0);
     const int64_t nb = k / QK_K;
 
-    // hptodo
-    const float d = GGML_FP16_TO_FP32(x->d);
+    for (int64_t i = 0; i < nb; i++) {
+        const float d = GGML_FP16_TO_FP32(x[i].d);
 
-    for (size_t j = 0; j < sizeof(x->qs); j += 2) {
-        uint8_t qp = x->qs[j];
-        uint8_t qn = x->qs[j + 1];
+        for (size_t j = 0; j < sizeof(x[i].qs); j += 32) {
+            const uint8_t *qs = x[i].qs + j;
 
-        for (int n = 0; n < 8; ++n) {
-            float v = 0.0f;
-            if (qp & (1 << n)) v = +1.0f;
-            else if (qn & (1 << n)) v = -1.0f;
-            *y++ = v * d;
+            for (int b = 0; b < 16; ++b) {
+                for (int n = 0; n < 8; ++n) {
+                    float v = 0.0f;
+                    if (qs[b * 2]     & (1 << n)) v = +1.0f;
+                    else if (qs[b * 2 + 1] & (1 << n)) v = -1.0f;
+                    *y++ = v * d;
+                }
+            }
         }
     }
 }
