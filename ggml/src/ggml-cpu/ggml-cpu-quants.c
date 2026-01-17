@@ -4573,7 +4573,7 @@ void ggml_vec_dot_tq2_m_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 #endif
 }
 
-
+#undef __ARM_NEON
 void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     // hptodon
     assert(nrc == 1);
@@ -4609,24 +4609,78 @@ void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
                 vld1q_s8(y[i].qs + j*4 +  96),
                 vld1q_s8(y[i].qs + j*4 + 112)
             };
+            uint8x16_t bit_qp = vandq_u8(qp, mask_1);
+            uint8x16_t bit_qn = vandq_u8(qn, mask_1);
+            int8x16_t mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
 
-            for (int b = 0; b < 8; ++b) {
-                uint8x16_t bit_qp = vandq_u8(qp, mask_1);
-                uint8x16_t bit_qn = vandq_u8(qn, mask_1);
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[0]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[0]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[1]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[1]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[2]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[2]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[3]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[3]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[4]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[4]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[5]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[5]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[6]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[6]));
+            qp = vshrq_n_u8(qp, 1);
+            qn = vshrq_n_u8(qn, 1);
+            bit_qp = vandq_u8(qp, mask_1);
+            bit_qn = vandq_u8(qn, mask_1);
+            mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[7]));
+            sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[7]));
+            // for (int b = 0; b < 8; ++b) {
+            //     uint8x16_t bit_qp = vandq_u8(qp, mask_1);
+            //     uint8x16_t bit_qn = vandq_u8(qn, mask_1);
 
-                // uint8x16_t qyp = vandq_u8(bit_qp, qy[b]);
-                // uint8x16_t qyn = vandq_u8(bit_qn, qy[b]);
+            //     // uint8x16_t qyp = vandq_u8(bit_qp, qy[b]);
+            //     // uint8x16_t qyn = vandq_u8(bit_qn, qy[b]);
                 
-                // sumi0 = vaddq_u16(sumi0, vaddl_u8(vget_low_u8(qyp), vget_high_u8(qyp)));
-                // sumi1 = vaddq_u16(sumi1, vaddl_u8(vget_low_u8(qyn), vget_high_u8(qyn)));
-                int8x16_t mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
+            //     // sumi0 = vaddq_u16(sumi0, vaddl_u8(vget_low_u8(qyp), vget_high_u8(qyp)));
+            //     // sumi1 = vaddq_u16(sumi1, vaddl_u8(vget_low_u8(qyn), vget_high_u8(qyn)));
+            //     int8x16_t mask = vreinterpretq_s8_u8(vsubq_u8(bit_qp, bit_qn));
 
-                sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[b]));
-                sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[b]));
+            //     sumi0 = vmlal_s8(sumi0, vget_low_s8(mask), vget_low_s8(qy[b]));
+            //     sumi1 = vmlal_s8(sumi1, vget_high_s8(mask), vget_high_s8(qy[b]));
 
-                qp = vshrq_n_u8(qp, 1);
-                qn = vshrq_n_u8(qn, 1);
-            }
+            //     qp = vshrq_n_u8(qp, 1);
+            //     qn = vshrq_n_u8(qn, 1);
+            // }
         }
 
         sumi0 = vaddq_u16(sumi0, sumi1);
@@ -4638,6 +4692,22 @@ void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
     }
     *s = sumf;
 #else
+
+// for (int i = 0; i < nb; ++i) {
+//     int32_t sumi = 0;
+//     for (size_t j = 0; j < QK_K / 4; j += 32) {
+//         // uint8_t qp[16] = {0}, qn[16] = {0};
+//         for (int nn = 0; nn < 8; ++nn) {
+//             size_t idx = j * 4 + 16 * nn;
+//             for (int b = 0; b < 16; b++) {
+//                 sumi += x->qs[idx + b] * (((y->qs[j + b * 2] >> nn) & 1) - ((y->qs[j + b * 2 + 1] >> nn) & 1));
+//             }
+//         }
+//     }
+//     float d = y[i].d * GGML_FP16_TO_FP32(x[i].d);
+//     sumf += (float) sumi * d;
+// }
+// *s = sumf;
     for (int i = 0; i < nb; ++i) {
         int32_t sumi = 0;
         for (int j = 0; j < QK_K / 4; j += 2) {
@@ -4668,7 +4738,7 @@ void ggml_vec_dot_tq2_n_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const vo
 #endif
 }
 
-// #undef __ARM_NEON
+#undef __ARM_NEON
 #undef __ARM_FEATURE_DOTPROD
 void ggml_vec_dot_tq2_0_q8_K(int n, float * GGML_RESTRICT s, size_t bs, const void * GGML_RESTRICT vx, size_t bx, const void * GGML_RESTRICT vy, size_t by, int nrc) {
     assert(nrc == 1);
